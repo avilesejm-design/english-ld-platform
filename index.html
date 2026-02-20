@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English L&D Platform - UX Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --p: #6366f1; --bg: #f8fafc; --txt: #1e293b; --error-bg: #fffcf0; --error-accent: #fbc02d; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--txt); margin: 0; padding: 0; }
+        .container { max-width: 800px; margin: 0 auto; padding: 60px 20px; display: none; }
+        .container.active { display: block; }
+
+        /* Estilo Cajas */
+        .quiz-box { background: white; border-radius: 32px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); max-width: 500px; margin: 0 auto; }
+        .input-field { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; margin-bottom: 20px; box-sizing: border-box; font-family: inherit; font-size: 16px; }
+
+        /* Dashboard */
+        .welcome-title { font-size: 36px; font-weight: 800; margin: 0; letter-spacing: -1px; }
+        .welcome-sub { color: #64748b; font-size: 18px; margin: 8px 0 40px 0; }
+        .level-card { background: var(--p); border-radius: 32px; padding: 40px; color: white; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2); }
+        .level-card h2 { font-size: 56px; margin: 0; font-weight: 800; }
+        .btn-pill { background: white; color: var(--p); border: none; padding: 14px 32px; border-radius: 50px; font-weight: 700; cursor: pointer; font-size: 15px; }
+
+        /* Actividad */
+        .activity-card { background: white; border-radius: 24px; padding: 24px; border: 1px solid #f1f5f9; }
+        .activity-item { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid #f1f5f9; }
+        .activity-item:last-child { border: 0; }
+        .progress-container { width: 100px; height: 6px; background: #f1f5f9; border-radius: 10px; margin-top: 8px; overflow: hidden; }
+        .progress-bar { height: 100%; transition: width 1s ease-in-out; }
+
+        /* Quiz UI */
+        .opcion { padding: 18px; border: 2px solid #f1f5f9; border-radius: 18px; margin-bottom: 12px; cursor: pointer; font-weight: 600; display: flex; gap: 12px; transition: 0.2s; }
+        .opcion.selected { border-color: var(--p); background: #f5f3ff; }
+        .btn-main { width: 100%; padding: 18px; border-radius: 16px; font-weight: 800; border: none; cursor: pointer; margin-top: 10px; }
+        .btn-p { background: var(--p); color: white; }
+        .btn-s { background: #10b981; color: white; }
+        .btn-exit { background: #f1f5f9; color: #475569; }
+        .fb-pill { padding: 16px; border-radius: 16px; text-align: center; font-weight: 700; margin-top: 20px; display: none; }
+
+        /* Feedback Mejorado */
+        .error-review-card { background-color: var(--error-bg); border-left: 5px solid var(--error-accent); border-radius: 16px; padding: 16px; margin-bottom: 12px; text-align: left; font-size: 14px; }
+        .wrong-txt { color: #d32f2f; text-decoration: line-through; font-weight: 700; }
+        .correct-txt { color: #166534; font-weight: 700; background: rgba(22, 101, 52, 0.1); padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div id="login-page" class="container active">
+    <div class="quiz-box" style="text-align:center;">
+        <div style="font-size:48px; margin-bottom:10px;">👋</div>
+        <h1 class="welcome-title">English L&D</h1>
+        <p class="welcome-sub">Ingrese su correo para acceder a su progreso</p>
+        <input type="email" id="user-email" value="avilesejm@gmail.com" class="input-field">
+        <button class="btn-main btn-p" onclick="handleLogin()">Acceder</button>
+    </div>
+</div>
+
+<div id="dashboard" class="container">
+    <button onclick="handleLogout()" style="float:right; background:none; border:none; color:#94a3b8; cursor:pointer; font-weight:700;">Cerrar Sesión ✕</button>
+    <h1 class="welcome-title">Welcome back!</h1>
+    <p class="welcome-sub" id="display-email"></p>
+
+    <div class="level-card">
+        <div>
+            <p style="margin:0; text-transform:uppercase; font-size:12px; font-weight:700; opacity:0.9;">Current Level</p>
+            <h2 id="dash-level-display">A1</h2>
+        </div>
+        <button class="btn-pill" onclick="startQuiz()">Take Level Test</button>
+    </div>
+
+    <h3 style="font-size:20px; font-weight:700; margin-bottom:20px;">Recent Activity</h3>
+    <div class="activity-card" id="history-container"></div>
+</div>
+
+<div id="test-page" class="container">
+    <div class="quiz-box">
+        <div style="display:flex; justify-content:space-between; margin-bottom:30px; font-size:13px; font-weight:700; color:#94a3b8;">
+            <span id="lvl-tag">LEVEL A1</span>
+            <span id="prog-tag">QUESTION 1/5</span>
+        </div>
+        <div id="quiz-ui"></div>
+        <div id="fb-area" class="fb-pill"></div>
+    </div>
+</div>
+
+<script>
+// Supabase Config [cite: 2026-02-13]
+const SUPABASE_URL = 'https://kretfnbddhbosacfgdup.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtyZXRmbmJkZGhib3NhY2ZnZHVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0Mjk3MTcsImV4cCI6MjA4NzAwNTcxN30.P0HLqGab3tB5WdsVGYKXEyK572JvthHYFg7iu3MJpgo';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let state = { nivel: 'A1', preguntas: [], idx: 0, hits: 0, select: null, errores: [], email: '' };
+
+// Login logic con Enter
+function handleLogin() {
+    state.email = document.getElementById('user-email').value;
+    if(state.email) {
+        document.getElementById('display-email').innerText = `Progresos de: ${state.email}`;
+        show('dashboard');
+        loadHistory();
+    }
+}
+
+document.getElementById('user-email').addEventListener('keypress', (e) => { if(e.key === 'Enter') handleLogin(); });
+
+function handleLogout() { state.email = ''; show('login-page'); }
+
+// Dashboard History
+async function loadHistory() {
+    const { data } = await db.from('historial_tests').select('*').eq('email', state.email).order('fecha', { ascending: false }).limit(3);
+    const container = document.getElementById('history-container');
+    if (!data || data.length === 0) { container.innerHTML = "<p>No hay actividad registrada.</p>"; return; }
+    
+    document.getElementById('dash-level-display').innerText = data[0].nivel_alcanzado;
+    container.innerHTML = data.map(i => `
+        <div class="activity-item">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <div style="background:#f1f5f9; padding:10px; border-radius:12px;">🎯</div>
+                <div>
+                    <div style="font-weight:700;">Score: ${i.aciertos}/5</div>
+                    <div class="progress-container"><div class="progress-bar" style="width:${(i.aciertos/5)*100}%; background:#6366f1"></div></div>
+                </div>
+            </div>
+            <span style="font-weight:800; color:#64748b;">${i.nivel_alcanzado}</span>
+        </div>`).join('');
+}
+
+// Test logic
+async function startQuiz() {
+    state.hits = 0; state.idx = 0; state.errores = [];
+    show('test-page');
+    const { data } = await db.rpc('get_random_questions', { nivel_param: state.nivel, limite: 5 });
+    state.preguntas = data;
+    render();
+}
+
+function render() {
+    state.select = null;
+    const q = state.preguntas[state.idx];
+    document.getElementById('prog-tag').innerText = `QUESTION ${state.idx + 1}/5`;
+    document.getElementById('fb-area').style.display = 'none';
+    
+    let ops = Object.entries(q.opciones).map(([k, v]) => `<div class="opcion" onclick="sel(this, '${v}')"><b>${k})</b> ${v}</div>`).join('');
+    document.getElementById('quiz-ui').innerHTML = `<h2 style="font-size:22px;">${q.enunciado}</h2>${ops}<button class="btn-main btn-p" id="btn-val" onclick="check()">Confirm Answer</button>`;
+}
+
+function sel(el, v) { 
+    state.select = v; 
+    document.querySelectorAll('.opcion').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected'); 
+}
+
+function check() {
+    if(!state.select) return;
+    const q = state.preguntas[state.idx];
+    const fb = document.getElementById('fb-area');
+    let ok = (q.respuesta || q.answer || "").toString().trim();
+    fb.style.display = 'block';
+    
+    if(state.select.toUpperCase() === ok.toUpperCase()) {
+        state.hits++; fb.style.background = "#dcfce7"; fb.style.color = "#166534"; fb.innerText = "✓ Correct";
+    } else {
+        state.errores.push({ q: q.enunciado, wrong: state.select, right: ok });
+        fb.style.background = "#fee2e2"; fb.style.color = "#991b1b"; fb.innerText = "✗ Incorrect";
+    }
+
+    document.getElementById('btn-val').disabled = true;
+    setTimeout(() => {
+        state.idx++;
+        if(state.idx < 5) render();
+        else { fb.style.display = 'none'; handleEnd(); }
+    }, 1200);
+}
+
+async function handleEnd() {
+    const niveles = ['A1','A2','B1','B2','C1','C2'];
+    const i = niveles.indexOf(state.nivel);
+    
+    // Si tiene 3 o más aciertos, supera el nivel. Si no, mantiene el nivel anterior o se queda en A1.
+    const superado = state.hits >= 3;
+    const finalLvl = superado ? state.nivel : (i > 0 ? niveles[i-1] : 'A1');
+    const next = niveles[i + 1];
+
+    let errorHtml = state.errores.map(err => `
+        <div class="error-review-card">
+            <strong>${err.q}</strong><br>
+            <span class="wrong-txt">✕ ${err.wrong}</span> | <span class="correct-txt">✓ ${err.right}</span>
+        </div>`).join('');
+
+    // Construcción del mensaje según el resultado
+    let titulo, mensajeNivel, botones;
+
+    if (superado) {
+        titulo = `<h2 style="color: #166534;">¡Nivel ${state.nivel} Superado! 🆙</h2>`;
+        mensajeNivel = `<p style="font-weight: 700;">Tu puntaje: ${state.hits}/5</p>`;
+        botones = `
+            ${next ? `<button class="btn-main btn-s" onclick="state.nivel='${next}'; startQuiz()">Comenzar Nivel ${next} ➔</button>` : ''}
+            <button class="btn-main btn-exit" onclick="finish('${finalLvl}')">Guardar y volver al Dashboard</button>
+        `;
+    } else {
+        titulo = `<h2 style="color: #991b1b;">Test Finalizado 📝</h2>`;
+        mensajeNivel = `
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 16px; margin: 20px 0;">
+                <p style="margin:0; font-size: 14px; color: #64748b; text-transform: uppercase; font-weight: 800;">Tu nivel actual es:</p>
+                <h3 style="margin:5px 0 0 0; font-size: 32px; font-weight: 800;">${finalLvl}</h3>
+            </div>
+            <p>Puntaje obtenido: ${state.hits}/5</p>
+        `;
+        botones = `
+            <button class="btn-main btn-p" onclick="startQuiz()">Reintentar Nivel ${state.nivel}</button>
+            <button class="btn-main btn-exit" onclick="finish('${finalLvl}')">Volver al Dashboard</button>
+        `;
+    }
+
+    document.getElementById('quiz-ui').innerHTML = `
+        <div style="text-align:center;">
+            ${titulo}
+            ${mensajeNivel}
+            ${state.errores.length > 0 ? `
+                <div style="text-align:left; margin: 20px 0 10px 0;">
+                    <small style="font-weight:800; color:#94a3b8; text-transform:uppercase;">Revisión de aprendizaje:</small>
+                </div>
+                ${errorHtml}
+            ` : ''}
+            <div style="margin-top: 20px;">
+                ${botones}
+            </div>
+        </div>`;
+}
+
+async function finish(lvl) {
+    await db.from('historial_tests').insert([{ email: state.email, nivel_alcanzado: lvl, aciertos: state.hits }]);
+    show('dashboard'); loadHistory();
+}
+
+function show(id) {
+    document.querySelectorAll('.container').forEach(c => { c.classList.remove('active'); c.style.display = 'none'; });
+    const target = document.getElementById(id);
+    target.classList.add('active'); target.style.display = 'block';
+}
+</script>
+</body>
+</html>
